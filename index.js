@@ -35,13 +35,6 @@ async function getUserData() {
 
   console.log({ data, error3 }); */
 }
-//getUserData();
-
-//console.log(process.env);
-
-app.get('/', (req, res) => {
-  res.sendStatus(200);
-});
 
 function addTextMessageToReply(message, text) {
   message.push({
@@ -68,18 +61,28 @@ function analyzeTextCommand(text) {
   return [type, command];
 }
 
-app.post('/webhook', async function (req, res) {
+function readLineEvents(req, res, next) {
+  const events = req.body.events;
+  if (Array.isArray(events)) {
+    if (events.length === 0) {
+      res.status(200).send('Ok');
+    } else {
+      next();
+    }
+  }
+}
+
+async function handleWebHook(req, res) {
   res.send('HTTP POST request sent to the webhook URL!');
   // If the user sends a message to your bot, send a reply message
-  if (req.body.events[0].type === 'message') {
-    //console.log(req.body.events);
-    // Message data, must be stringified
-    const event = req.body.events[0];
+
+  const event = req.body.events[0];
+
+  if (event.type === 'message') {
     const messageType = event.message.type;
     const messages = [];
     const lineId = event.source.userId;
     const inputText = event.message.text;
-    //console.log({ lineId });
 
     const [commandType, command] = analyzeTextCommand(inputText);
 
@@ -113,17 +116,17 @@ app.post('/webhook', async function (req, res) {
         console.log({ data, error });
 
         if (data.length === 0) {
-          addTextMessageToReply(messages, `You have not registed!`);
+          addTextMessageToReply(messages, `คุณยังไม่ได้ลงทะเบียน`);
         } else {
           addTextMessageToReply(
             messages,
-            `Your registed CMU-ID is ${data[0].cmu_id}`
+            `Your registered CMU-ID is ${data[0].cmu_id}.`
           );
         }
 
         break;
       default:
-        addTextMessageToReply(messages, 'ไม่เข้าใจ');
+        addTextMessageToReply(messages, 'ผมไม่เข้าใจ');
         break;
     }
 
@@ -163,7 +166,13 @@ app.post('/webhook', async function (req, res) {
     request.write(dataString);
     request.end();
   }
+}
+
+app.get('/', (req, res) => {
+  res.sendStatus(200);
 });
+
+app.post('/webhook', readLineEvents, handleWebHook);
 app.listen(PORT, () => {
   console.log(`Example app listening at http://localhost:${PORT}`);
 });

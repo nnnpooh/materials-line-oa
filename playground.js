@@ -30,3 +30,9 @@ let error = null;
 if (error) {
   console.log('hey');
 }
+
+let f = [];
+
+if (Array.isArray(f)) {
+  console.log('here');
+}
