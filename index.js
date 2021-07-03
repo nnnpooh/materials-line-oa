@@ -11,7 +11,6 @@ const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const serviceKey = process.env.SERVICE_KEY;
-//console.log({ supabaseUrl, supabaseKey, serviceKey });
 const supabase = createClient(supabaseUrl, serviceKey);
 
 app.use(express.json());
@@ -22,14 +21,18 @@ app.use(
 );
 
 async function test() {
-  const { data, error } = await supabase
+  /*   const { data, error } = await supabase
     .from('users')
-    .select('*, registered_students (cmu_id, email, firstname) ');
+    .select('*, registered_students (cmu_id, email, firstname) '); */
+  const { data, error } = await supabase
+    .from('users_details')
+    .select('*')
+    .eq('email', 'test@test.com');
 
   console.log({ data, error });
-  console.log(data[0].registered_students);
+  //console.log(data[0].registered_students);
 }
-//test();
+test();
 
 async function getUserData() {
   //let { data: users, error } = await supabase.from('users').select('*');
@@ -59,14 +62,20 @@ function analyzeTextCommand(text) {
 
   let reg = /^(REG:\d+)/;
   let look = /^(CMUID)/;
-  let regNum = /\d+/;
+  let regNum = /[^(REG:)]\d*/;
+  let code = /^(CODE:[a-zA-Z0-9]+)/;
+  let codeText = /[^(CODE:)\s*][a-zA-Z0-9]/;
 
   if (reg.exec(text)) {
     type = 'registration';
     command = regNum.exec(text)[0];
   } else if (look.exec(text)) {
     type = 'lookUpId';
+  } else if (code.exec(text)) {
+    type = 'checkin';
+    command = codeText.exec(text)[0];
   } else {
+    type = 'unknown';
   }
 
   return [type, command];
@@ -128,7 +137,7 @@ async function handleWebHook(req, res) {
           ) {
             addTextMessageToReply(
               messages,
-              `Already added register CMU-ID to this LINE account.`
+              `Already registered CMU-ID to this LINE account.`
             );
           }
         }
@@ -136,19 +145,17 @@ async function handleWebHook(req, res) {
         break;
       case 'lookUpId':
         ({ data, error } = await supabase
-          .from('users')
-          .select('*, registered_students(*)')
+          .from('users_details')
+          .select('*')
           .eq('line_id', lineId));
-        console.log({ data, error });
 
         if (data.length === 0) {
           addTextMessageToReply(messages, `คุณยังไม่ได้ลงทะเบียน`);
         } else {
-          console.log(data[0]);
-
+          let d0 = data[0];
           addTextMessageToReply(
             messages,
-            `Your registered CMU-ID is ${data[0].cmu_id}.`
+            `Your registration details:\nCMUID: ${d0.cmu_id}\nName: ${d0.firstname} ${d0.lastname}\nEmail: ${d0.email}`
           );
         }
 
