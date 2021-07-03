@@ -32,22 +32,7 @@ async function test() {
   console.log({ data, error });
   //console.log(data[0].registered_students);
 }
-test();
-
-async function getUserData() {
-  //let { data: users, error } = await supabase.from('users').select('*');
-  //console.log({ users, error });
-  /*   let { data, error2 } = await supabase
-    .from('users')
-    .insert([{ cmu_id: '23434234', line_id: '34234234' }]);
- */
-  /*   let { data, error3 } = await supabase
-    .from('users')
-    .update({ cmu_id: 'updated' })
-    .match({ cmu_id: '23434234' });
-
-  console.log({ data, error3 }); */
-}
+//test();
 
 function addTextMessageToReply(message, text) {
   message.push({
@@ -64,7 +49,7 @@ function analyzeTextCommand(text) {
   let look = /^(CMUID)/;
   let regNum = /[^(REG:)]\d*/;
   let code = /^(CODE:[a-zA-Z0-9]+)/;
-  let codeText = /[^(CODE:)\s*][a-zA-Z0-9]/;
+  let codeText = /[^(CODE:)\s*][a-zA-Z0-9]*/;
 
   if (reg.exec(text)) {
     type = 'registration';
@@ -89,6 +74,48 @@ function readLineEvents(req, res, next) {
     } else {
       next();
     }
+  } else {
+    res.stats(400).send('Could not understand the data.');
+  }
+}
+
+async function checkRegistration(req, res, next) {
+  const lineId = req.body.events[0].source.userId;
+  req.lineId = lineId;
+  const { data, error } = await supabase
+    .from('users_details')
+    .select('*')
+    .eq('line_id', lineId);
+
+  if (!error) {
+    if (data.length === 0) {
+      req.isRegistered = false;
+      req.registeredData = [];
+    } else {
+      req.isRegistered = true;
+      req.registeredData = data[0];
+    }
+    next();
+  } else {
+    next(new Error('Cannot get registered user details.'));
+  }
+}
+
+async function checkValidCodes(req, res, next) {
+  const { data, error } = await supabase.from('codes').select('*');
+  //console.log(data);
+  req.availableCodes = data;
+  if (!error) {
+    if (data.length != 0) {
+      req.isValidCodes = true;
+      req.validCodes = data;
+    } else {
+      req.isValidCodes = false;
+      req.validCodes = data;
+    }
+    next();
+  } else {
+    next(new Error('Cannot get codes.'));
   }
 }
 
@@ -97,68 +124,99 @@ async function handleWebHook(req, res) {
   // If the user sends a message to your bot, send a reply message
 
   const event = req.body.events[0];
+  const lineId = req.lineId;
 
   if (event.type === 'message') {
     const messageType = event.message.type;
     const messages = [];
-    const lineId = event.source.userId;
     const inputText = event.message.text;
 
     const [commandType, command] = analyzeTextCommand(inputText);
+    console.log({ commandType, command });
 
-    //console.log({ commandType, command });
-    let data = '';
-    let error = '';
+    let data, error;
 
     switch (commandType) {
       case 'registration':
-        const cmuId = command;
-        ({ data, error } = await supabase
-          .from('users')
-          .insert([{ cmu_id: cmuId, line_id: lineId }]));
-
         //console.log({ cmuId });
         //console.log({ data, error });
-        if (!error) {
+
+        if (req.isRegistered) {
           addTextMessageToReply(
             messages,
-            `Register CMU-ID ${cmuId} to this LINE account.`
+            `You already registered under \nCMUID: ${req.registeredData.cmu_id}.`
           );
         } else {
-          if (error.message.includes('violates foreign key constraint')) {
+          const cmuId = command;
+          ({ data, error } = await supabase
+            .from('users')
+            .insert([{ cmu_id: cmuId, line_id: lineId }]));
+
+          if (!error) {
             addTextMessageToReply(
               messages,
-              `You have not registered for this class.`
+              `Register CMU-ID ${cmuId} to this LINE account.`
             );
           } else if (
-            error.message.includes(
-              'duplicate key value violates unique constraint'
-            )
+            error.message.includes('violates foreign key constraint')
           ) {
             addTextMessageToReply(
               messages,
-              `Already registered CMU-ID to this LINE account.`
+              `You have not registered for this class.`
             );
           }
         }
 
         break;
       case 'lookUpId':
-        ({ data, error } = await supabase
-          .from('users_details')
-          .select('*')
-          .eq('line_id', lineId));
-
-        if (data.length === 0) {
-          addTextMessageToReply(messages, `คุณยังไม่ได้ลงทะเบียน`);
-        } else {
-          let d0 = data[0];
+        if (req.isRegistered) {
+          let d0 = req.registeredData;
           addTextMessageToReply(
             messages,
             `Your registration details:\nCMUID: ${d0.cmu_id}\nName: ${d0.firstname} ${d0.lastname}\nEmail: ${d0.email}`
           );
+        } else {
+          addTextMessageToReply(messages, `คุณยังไม่ได้ลงทะเบียน`);
         }
 
+        break;
+      case 'checkin':
+        if (req.isRegistered) {
+          if (req.isValidCodes) {
+            const code = command;
+            const codes = req.validCodes;
+
+            const matchCode = codes.find((el) => el.code == code);
+
+            console.log({ code, codes });
+
+            console.log(matchCode);
+            if (matchCode) {
+              const { data, error } = await supabase.from('checkins').insert([
+                {
+                  comb: lineId + ':' + matchCode.code,
+                  line_id: lineId,
+                  code: matchCode.code,
+                },
+              ]);
+
+              if (!error) {
+                addTextMessageToReply(messages, 'Checkin!');
+              } else {
+                addTextMessageToReply(messages, 'คุณ Checkin ไปแล้ว');
+              }
+            } else {
+              addTextMessageToReply(messages, 'Code ไม่ถูกต้อง');
+            }
+          } else {
+            addTextMessageToReply(messages, 'ไม่มีการเช็คชื่อในขณะนี้');
+          }
+        } else {
+          addTextMessageToReply(
+            messages,
+            'คุณยังไม่ได้ลงทะเบียน กรุณาลงทะเบียนก่อน'
+          );
+        }
         break;
       default:
         addTextMessageToReply(messages, 'ผมไม่เข้าใจ');
@@ -207,7 +265,13 @@ app.get('/', (req, res) => {
   res.sendStatus(200);
 });
 
-app.post('/webhook', readLineEvents, handleWebHook);
+app.post(
+  '/webhook',
+  readLineEvents,
+  checkRegistration,
+  checkValidCodes,
+  handleWebHook
+);
 app.listen(PORT, () => {
   console.log(`Example app listening at http://localhost:${PORT}`);
 });
