@@ -21,6 +21,16 @@ app.use(
   })
 );
 
+async function test() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*, registered_students (cmu_id, email, firstname) ');
+
+  console.log({ data, error });
+  console.log(data[0].registered_students);
+}
+//test();
+
 async function getUserData() {
   //let { data: users, error } = await supabase.from('users').select('*');
   //console.log({ users, error });
@@ -47,12 +57,13 @@ function analyzeTextCommand(text) {
   let type = '';
   let command = '';
 
-  let reg = /^(REG:)/;
+  let reg = /^(REG:\d+)/;
   let look = /^(CMUID)/;
+  let regNum = /\d+/;
 
   if (reg.exec(text)) {
     type = 'registration';
-    command = text.substring(5);
+    command = regNum.exec(text)[0];
   } else if (look.exec(text)) {
     type = 'lookUpId';
   } else {
@@ -97,27 +108,44 @@ async function handleWebHook(req, res) {
           .from('users')
           .insert([{ cmu_id: cmuId, line_id: lineId }]));
 
-        console.log({ data, error });
+        //console.log({ cmuId });
+        //console.log({ data, error });
         if (!error) {
-          addTextMessageToReply(messages, `Add ${cmuId} to the database.`);
-        } else {
           addTextMessageToReply(
             messages,
-            `Already added data to the database.`
+            `Register CMU-ID ${cmuId} to this LINE account.`
           );
+        } else {
+          if (error.message.includes('violates foreign key constraint')) {
+            addTextMessageToReply(
+              messages,
+              `You have not registered for this class.`
+            );
+          } else if (
+            error.message.includes(
+              'duplicate key value violates unique constraint'
+            )
+          ) {
+            addTextMessageToReply(
+              messages,
+              `Already added register CMU-ID to this LINE account.`
+            );
+          }
         }
 
         break;
       case 'lookUpId':
         ({ data, error } = await supabase
           .from('users')
-          .select('*')
+          .select('*, registered_students(*)')
           .eq('line_id', lineId));
         console.log({ data, error });
 
         if (data.length === 0) {
           addTextMessageToReply(messages, `คุณยังไม่ได้ลงทะเบียน`);
         } else {
+          console.log(data[0]);
+
           addTextMessageToReply(
             messages,
             `Your registered CMU-ID is ${data[0].cmu_id}.`
