@@ -5,6 +5,7 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.LINE_ACCESS_TOKEN;
+const dateFNS = require('date-fns');
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -24,10 +25,18 @@ async function test() {
   /*   const { data, error } = await supabase
     .from('users')
     .select('*, registered_students (cmu_id, email, firstname) '); */
-  const { data, error } = await supabase
+  /*   const { data, error } = await supabase
     .from('users_details')
     .select('*')
-    .eq('email', 'test@test.com');
+    .eq('email', 'test@test.com'); */
+
+  const dateNow = dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm:ss');
+  console.log(dateNow);
+  const { data, error } = await supabase
+    .from('codes')
+    .select('*')
+    .lt('timestart', dateNow)
+    .gt('timeend', dateNow);
 
   console.log({ data, error });
   //console.log(data[0].registered_students);
@@ -102,8 +111,14 @@ async function checkRegistration(req, res, next) {
 }
 
 async function checkValidCodes(req, res, next) {
-  const { data, error } = await supabase.from('codes').select('*');
-  //console.log(data);
+  const dateNow = dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm:ss');
+  const { data, error } = await supabase
+    .from('codes')
+    .select('*')
+    .lt('timestart', dateNow)
+    .gt('timeend', dateNow);
+  console.log(data);
+
   req.availableCodes = data;
   if (!error) {
     if (data.length != 0) {
