@@ -31,14 +31,14 @@ async function test() {
     .eq('email', 'test@test.com'); */
 
   const dateNow = dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm:ss');
-  console.log(dateNow);
+  //console.log(dateNow);
   const { data, error } = await supabase
     .from('codes')
     .select('*')
     .lt('timestart', dateNow)
     .gt('timeend', dateNow);
 
-  console.log({ data, error });
+  // console.log({ data, error });
   //console.log(data[0].registered_students);
 }
 //test();
@@ -59,6 +59,8 @@ function analyzeTextCommand(text) {
   let regNum = /[^(REG:)]\d*/;
   let code = /^(CODE:[a-zA-Z0-9]+)/;
   let codeText = /[^(CODE:)\s*][a-zA-Z0-9]*/;
+  let record = /^(RECORD\s*)/;
+  let ignore = /^(>>)/;
 
   if (reg.exec(text)) {
     type = 'registration';
@@ -68,6 +70,10 @@ function analyzeTextCommand(text) {
   } else if (code.exec(text)) {
     type = 'checkin';
     command = codeText.exec(text)[0];
+  } else if (record.exec(text)) {
+    type = 'record';
+  } else if (ignore.exec(text)) {
+    type = 'ignore';
   } else {
     type = 'unknown';
   }
@@ -111,12 +117,14 @@ async function checkRegistration(req, res, next) {
 }
 
 async function checkValidCodes(req, res, next) {
-  const dateNow = dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm:ss');
+  const dateNow = dateFNS.format(new Date(), 'yyyy-MM-dd HH:mm:ss');
   const { data, error } = await supabase
     .from('codes')
     .select('*')
     .lt('timestart', dateNow)
     .gt('timeend', dateNow);
+
+  console.log(dateNow);
   console.log(data);
 
   req.availableCodes = data;
@@ -170,14 +178,14 @@ async function handleWebHook(req, res) {
           if (!error) {
             addTextMessageToReply(
               messages,
-              `Register CMU-ID ${cmuId} to this LINE account.`
+              `คุณได้ลงทะเบียนรหัส นศ. ${cmuId} กับแอปนี้แล้ว`
             );
           } else if (
             error.message.includes('violates foreign key constraint')
           ) {
             addTextMessageToReply(
               messages,
-              `You have not registered for this class.`
+              `ไม่มีข้อมูลลงทะเบียนของคุณในทะเบียนของมหาวิทยาลัย`
             );
           }
         }
@@ -191,7 +199,7 @@ async function handleWebHook(req, res) {
             `Your registration details:\nCMUID: ${d0.cmu_id}\nName: ${d0.firstname} ${d0.lastname}\nEmail: ${d0.email}`
           );
         } else {
-          addTextMessageToReply(messages, `คุณยังไม่ได้ลงทะเบียน`);
+          addTextMessageToReply(messages, `คุณยังไม่ได้ลงทะเบียนในแอปนี้`);
         }
 
         break;
@@ -203,20 +211,24 @@ async function handleWebHook(req, res) {
 
             const matchCode = codes.find((el) => el.code == code);
 
-            console.log({ code, codes });
+            //console.log({ code, codes });
 
-            console.log(matchCode);
+            //console.log(matchCode);
             if (matchCode) {
               const { data, error } = await supabase.from('checkins').insert([
                 {
                   comb: lineId + ':' + matchCode.code,
                   line_id: lineId,
                   code: matchCode.code,
+                  timerecord: dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm:ss'),
                 },
               ]);
 
               if (!error) {
-                addTextMessageToReply(messages, 'Checkin!');
+                addTextMessageToReply(
+                  messages,
+                  `Check-In @ ${dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm')}`
+                );
               } else {
                 addTextMessageToReply(messages, 'คุณ Checkin ไปแล้ว');
               }
@@ -229,9 +241,37 @@ async function handleWebHook(req, res) {
         } else {
           addTextMessageToReply(
             messages,
-            'คุณยังไม่ได้ลงทะเบียน กรุณาลงทะเบียนก่อน'
+            'คุณยังไม่ได้ลงทะเบียนในแอปนี้ กรุณาลงทะเบียนก่อน'
           );
         }
+        break;
+      case 'record':
+        if (req.isRegistered) {
+          const { data, error } = await supabase
+            .from('checkins_details')
+            .select('*')
+            .eq('line_id', lineId);
+
+          if (data.length !== 0) {
+            const dataMap = data.map((el) => {
+              return `Class: ${el.classid}-${el.section}: Check-In @ ${new Date(
+                el.timerecord
+              ).toLocaleString()}`;
+            });
+
+            addTextMessageToReply(messages, dataMap.join('\n'));
+          } else {
+            addTextMessageToReply(messages, 'ไม่พบข้อมูลการ Check-In');
+          }
+        } else {
+          addTextMessageToReply(
+            messages,
+            'คุณยังไม่ได้ลงทะเบียนในแอปนี้ กรุณาลงทะเบียนก่อน'
+          );
+        }
+        break;
+      case 'ignore':
+        addTextMessageToReply(messages, ':)');
         break;
       default:
         addTextMessageToReply(messages, 'ผมไม่เข้าใจ');
