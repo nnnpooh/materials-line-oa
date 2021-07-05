@@ -10,7 +10,10 @@ const csv = require('csvtojson');
 
 const fs = require('fs');
 
-const csvFilePath = './student_data/studentlist_259103_001000.csv';
+//const csvFilePath = './student_data/studentlist_259103_001000.csv';
+//const csvFilePath = './student_data/studentlist_259103_006000.csv';
+const csvFilePath = './student_data/studentlist_259103_802000.csv';
+
 const data = fs.readFileSync(csvFilePath, 'utf8');
 console.log(data);
 
@@ -18,9 +21,17 @@ async function addData() {
   const students = await csv().fromFile(csvFilePath);
   console.log(students);
 
-  const { data, error } = await supabase
-    .from('registered_students')
-    .insert(students);
+  try {
+    const { data, error } = await supabase
+      .from('registered_students')
+      .insert(students);
+
+    if (error) {
+      console.log(error);
+    }
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 addData();
