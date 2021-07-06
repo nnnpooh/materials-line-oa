@@ -19,7 +19,7 @@ console.log(data);
 
 async function addData() {
   const students = await csv().fromFile(csvFilePath);
-  console.log(students);
+  //console.log(students);
 
   try {
     const { data, error } = await supabase
