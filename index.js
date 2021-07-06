@@ -30,7 +30,7 @@ async function test() {
     .select('*')
     .eq('email', 'test@test.com'); */
 
-  const dateNow = dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm:ss');
+  const dateNow = dateFNS.format(new Date(), 'yyyy-MM-dd HH:mm:ss');
   //console.log(dateNow);
   const { data, error } = await supabase
     .from('codes')
@@ -220,14 +220,14 @@ async function handleWebHook(req, res) {
                   comb: lineId + ':' + matchCode.code,
                   line_id: lineId,
                   code: matchCode.code,
-                  timerecord: dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm:ss'),
+                  timerecord: dateFNS.format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
                 },
               ]);
 
               if (!error) {
                 addTextMessageToReply(
                   messages,
-                  `Check-In @ ${dateFNS.format(new Date(), 'yyyy-MM-dd hh:mm')}`
+                  `Check-In @ ${dateFNS.format(new Date(), 'yyyy-MM-dd HH:mm')}`
                 );
               } else {
                 addTextMessageToReply(messages, 'คุณ Checkin ไปแล้ว');
