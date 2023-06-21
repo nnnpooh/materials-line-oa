@@ -10,10 +10,10 @@ const csv = require("csvtojson");
 
 const fs = require("fs");
 
-const csvFilePath = "./student_data/studentlist_259103_003000.csv";
+const csvFilePath = "./temp/student_data/roster.csv";
 
 const data = fs.readFileSync(csvFilePath, "utf8");
-console.log(data);
+// console.log(data);
 
 async function addData() {
   const students = await csv().fromFile(csvFilePath);
