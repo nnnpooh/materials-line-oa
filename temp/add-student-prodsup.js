@@ -10,21 +10,21 @@ const csv = require("csvtojson");
 
 const fs = require("fs");
 
-const csvFilePath = "./student_data/studentlist_255217_formatted.csv";
+const csvFilePath = "./temp/student_data/studentlist_255217.csv";
 
 // const data = fs.readFileSync(csvFilePath, "utf8");
 // console.log(data);
 
 async function addRegisteredData() {
   const students = await csv().fromFile(csvFilePath);
-  //console.log(students);
+  // console.log(students);
 
   let registeredData = students.map((el) => {
     const { sec, ...rest } = el;
 
     return {
       ...rest,
-      email: `${el.cmu_id}@cmu.ac.th`,
+      // email: `${el.cmu_id}@cmu.ac.th`,
     };
   });
 
@@ -35,30 +35,35 @@ async function addRegisteredData() {
     };
   });
 
-  // console.log(registeredData);
-  // console.log(userData);
+  // console.log(registeredData.slice(0, 4));
+  // console.log(userData.slice(0, 4));
 
-  try {
-    const { data, error } = await supabase
-      .from("registered_students")
-      .insert(registeredData);
+  /* Add student data to registered_students table */
+  // registeredData.forEach(async (el) => {
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from("registered_students")
+  //       .insert([el]);
 
-    if (error) {
+  //     if (error) {
+  //       console.log(error);
+  //     }
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  // });
+
+  /* Preregistered students to users table */
+  userData.forEach(async (el) => {
+    try {
+      const { data, error } = await supabase.from("users").insert([el]);
+      if (error) {
+        console.log(error);
+      }
+    } catch (error) {
       console.log(error);
     }
-  } catch (error) {
-    console.log(error);
-  }
-
-  try {
-    const { data, error } = await supabase.from("users").insert(userData);
-
-    if (error) {
-      console.log(error);
-    }
-  } catch (error) {
-    console.log(error);
-  }
+  });
 }
 
 addRegisteredData();
