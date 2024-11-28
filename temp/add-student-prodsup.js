@@ -10,14 +10,14 @@ const csv = require("csvtojson");
 
 const fs = require("fs");
 
-const csvFilePath = "./temp/student_data/studentlist_255217.csv";
+const csvFilePath = "./temp/student_data/255217_2567_2_V1.csv.csv";
 
 // const data = fs.readFileSync(csvFilePath, "utf8");
 // console.log(data);
 
 async function addRegisteredData() {
   const students = await csv().fromFile(csvFilePath);
-  // console.log(students);
+  console.log(students);
 
   let registeredData = students.map((el) => {
     const { sec, ...rest } = el;
@@ -35,8 +35,8 @@ async function addRegisteredData() {
     };
   });
 
-  // console.log(registeredData.slice(0, 4));
-  // console.log(userData.slice(0, 4));
+  console.log(registeredData.slice(0, 4));
+  console.log(userData.slice(0, 4));
 
   /* Add student data to registered_students table */
   // registeredData.forEach(async (el) => {
