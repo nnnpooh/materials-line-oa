@@ -10,8 +10,7 @@ const csv = require("csvtojson");
 
 const fs = require("fs");
 
-const csvFilePath =
-  "./temp/student_data/whole_class_formatted.csv";
+const csvFilePath = "./temp/student_data/259103_2568_1_V1.csv";
 
 const data = fs.readFileSync(csvFilePath, "utf8");
 console.log(data);
